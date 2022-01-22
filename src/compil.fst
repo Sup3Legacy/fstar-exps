@@ -117,6 +117,14 @@ let rec list_closed (l: list deBruijn) (n: nat) =
     | [] -> True
     | t :: tl -> (genClosure t n) /\ (list_closed tl n)
 
+let rec list_closed_trans (n: nat) (l: (list deBruijn){list_closed l n}) (i: nat{i > n}):
+    Lemma (ensures (list_closed l i)) =
+    match l with
+    | [] -> ()
+    | hd :: tl ->
+        genClosure_trans hd n i;
+        list_closed_trans n tl i
+
 let rec subst_mult_pc (t: deBruijn) (n: nat) 
     (ul: (list deBruijn){list_closed ul n}):
     Lemma (ensures (
@@ -124,14 +132,34 @@ let rec subst_mult_pc (t: deBruijn) (n: nat)
     )) = 
     admit()
 
+let cons_nil (u: deBruijn) :
+    Lemma (ensures (u :: [] = [u])) = ()
+
+let rec fold_left_comp f l o (n: nat) =
+    match l with 
+    | [] -> o 
+    | hd :: tl -> 
+        fold_left_comp f tl (f hd o n) (n + 1)
+
+let rec subst_mult_decomp (t: deBruijn) (n: nat)
+    (ul: (list deBruijn){list_closed ul n}) :
+    Lemma (ensures (
+        (substMult t n ul) =
+            fold_left_comp 
+                (fun elt term n' -> substitution term n' elt) 
+                ul t n
+    )) =
+    match ul with 
+    | [] -> subst_mult_nil t n; ()
+    | hd :: tl -> 
+        subst_mult_decomp t n tl;
+        ()
+
 let rec subst_mult_master (t: deBruijn) (n: nat)
     (ul: (list deBruijn){list_closed ul n}) (u: deBruijn) :
     Lemma (ensures (
         (substMult t n (u :: ul)) = (substitution (substMult t (n + 1) ul) n u)
-    )) = 
-    match ul with 
-    | [] -> 
-        subst_mult_nil t n; 
-        subst_mult_pc t (n + 1) []; 
-        subst_mult_wd t n u; ()
-    | _ -> admit()
+    )) 
+    (decreases %[ul; n]) = 
+    admit()
+        
